@@ -1,8 +1,5 @@
-### Adrián Morente Gabaldón
-
 # Práctica 2 - Seguridad y Protección de Sistemas Informáticos
-
-***
+### Adrián Morente Gabaldón
 
 ***
 
@@ -14,7 +11,9 @@ Generamos el par de claves fácilmente con el comando `openssl genrsa`, pasando 
 
 Para este primer caso no la protegeremos con ninguna contraseña. El contenido es el siguiente:
 
-![nombreRSAkey.pem](./capturas/nombreRSAkey.pem.bmp)
+<img src="./capturas/nombreRSAkey.pem.bmp" width="80%" alt="nombreRSAkey.pem.bmp">
+
+---
 
 ### 2. "Extraed" la clave privada contenida en el archivo nombreRSAkey.pem a otro archivo que tenga por nombre nombreRSApriv.pem. Este archivo deberá estar protegido por contraseña cifrándolo con AES-128. Mostrad sus valores.
 
@@ -27,7 +26,9 @@ El comando completo sería el siguiente, y a continuación una captura con el re
 
 `openssl rsa -in nombreRSAkey.pem -out nombreRSApriv.pem -aes128`
 
-![nombreRSApriv.pem](./capturas/nombreRSApriv.pem.bmp)
+<img src="./capturas/nombreRSApriv.pem.bmp" width="80%" alt="nombreRSApriv.pem.bmp">
+
+---
 
 ### 3. Extraed en nombreRSApub.pem la clave pública contenida en el archivo nombreRSAkey.pem. Evidentemente nombreRSApub.pem no debe estar cifrado ni protegido. Mostrad sus valores.
 
@@ -37,36 +38,142 @@ Por defecto, cuando imprimimos el contenido del archivo contenedor de nuestro **
 
 Lógicamente, una clave pública no debe ser protegida con contraseña. El valor obtenido es:
 
-![nombreRSApub.pem](./capturas/nombreRSApub.pem.bmp)
+<img src="./capturas/nombreRSApub.pem.bmp" width="80%" alt="nombreRSApub.pem.bmp">
+
+---
 
 ### 4. Reutilizaremos el archivo binario input.bin de 1024 bits, todos ellos con valor 0, de la práctica anterior.
 
 Recuperamos el fichero que tenía el siguiente contenido:
 
-<img src="./capturas/input.bin.png" width="70%">
+<img src="./capturas/input.bin.png" width="70%" alt="input.bin.png">
+
+---
 
 ### 5. Intentad cifrar input.bin con vuestra clave pública. Explicad el resultado.
 
 Para el ejemplo, vamos a intentar cifrar el archivo input.bin con *DES* en modo *ECB*, pasando como entrada la clave pública contenida en el archivo `nombreRSApub.pem`:
 
-`openssl enc -des-ecb -in binarios/input.bin -out binarios/input-des-ecb.bin -K XXXXXXXXX`
+`openssl rsautl -in binarios/input.bin -out binarios/input-rsa.bin -inkey nombreRSApub.pem -pubin -encrypt`
 
 Sin embargo, obtenemos el siguiente error:
 
-![Cifrando input con public key](./capturas/cifrando-input-con-pub.bmp)
+```
+RSA operation error
+139685646712640:error:0406D06E:rsa routines:RSA_padding_add_PKCS1_type_2:data
+too large for key size:rsa_pk1.c:153:
+```
 
-El error es lógico dado que el fichero input.bin tiene un tamaño de 1024 bits mientras que nuestra clave pública tan solo de 768. Si probamos con una clave de mayor tamaño
+El error obtenido se debe a que RSA es un cifrado de flujo y no por bloques, así que no permite cifrar mensajes mayores que su clave.
+
+---
 
 ### 6. Diseñad un cifrado híbrido, con RSA como criptosistema asimétrico. El modo de proceder será el siguiente:
+
   1. El emisor debe seleccionar un sistema simétrico con su correspondiente modo de operación.
   2. El emisor generará un archivo de texto, llamado por ejemplo `sessionkey` con dos líneas. La primera línea contendrá una cadena aleatoria hexadecimal cuya longitud sea la requerida por la clave. OpenSSL permite generar cadenas aleatorias con el comando `openssl rand`. La segunda línea contendrá la información del criptosistema simétrico seleccionado. Por ejemplo, si hemos decidido emplear el algoritmo Blowfish en modo ECB, la segunda línea debería contener `-bf-ecb`.
   3. El archivo `sessionkey` se cifrará con la clave pública del receptor.
-  4. El mensaje se cifrará utilizando el criptosistema simétrico, la clave se generará a partir del archivo anterior mediante la opción `-pass file:sessionkey`
+  4. El mensaje se cifrará utilizando el criptosistema simétrico, la clave se generará a partir del archivo anterior mediante la opción `-pass file:sessionkey`.
 
-### 7.
+---
 
+  - Vamos a utilizar el sistema AES-256 en modo ECB, por lo que deberemos utilizar claves de 256 bits (32 Bytes exactamente) y bloques de 128 bits.
+  - Deberemos crear el fichero `sessionkey` con una longitud de clave de 256 bits en la primera línea, con el comando `openssl rand -out sessionkey -hex 32`, y la opción -aes-256-ecb en la segunda.
+  - Ahora pasamos a cifrar dicho archivo con la clave pública del receptor. Para este caso de ejemplo, utilizaremos la clave pública generada en los ejercicios anteriores, utilizando el comando visto en el ejercicio anterior:
+  `openssl rsautl -in sessionkey -out encrypted-sessionkey -inkey nombreRSApub.pem -pubin -encrypt`. Esto generará un contenido binario que no podemos visualizar en la terminal, pero sí en el editor hexadecimal:
+
+  <img src="./capturas/encrypted-sessionkey.bmp" width="70%" alt="encrypted-sessionkey.bmp">
+
+  - Ahora cifraremos con el sistema antes elegido (AES-256 en modo ECB) el mensaje, que para el caso volverá a ser el archivo input.bin. Esto lo hacemos fácilmente con el comando `openssl enc -aes-256-ecb -in binarios/input.bin -out binarios/input-aes-256-ecb.bin -pass file:sessionkey`. Una vez ejecutado, el archivo binario resultante *(el mensaje)* tendrá el siguiente contenido:
+
+  <img src="./capturas/input-aes-256-ecb.bin.bmp" width="70%" alt="input-aes-256-ecb.bin.bmp">
+
+---
+
+### 7. Utilizando el criptosistema híbrido diseñado, cada uno debe cifrar el archivo input.bin con su clave pública para, a continuación, descifrarlo con la clave privada. Comparad el resultado con el archivo original.
+
+El procedimiento que sigue el sistema es el siguiente:
+
+  1. **(Emisor)** - Cifra el mensaje con la clave de sesión generada aleatoriamente.
+  2. **(Emisor)** - Cifra la clave de sesión con la clave pública del receptor.
+  3. **(Receptor)** - Descifra la clave de sesión encriptada, con su propia clave privada.
+  4. **(Receptor)** - Descifra el mensaje con la clave de sesión obtenida en el paso anterior.
+
+Con este método, nos aseguramos de que nadie salvo el receptor (quien se presupone el único conocedor de su clave privada) pueda desencriptar la clave de sesión y por tanto interferir en los mensajes. Se asegura la ***confidencialidad***.
+
+  - Ahora bien, tras lo realizado en el ejercicio anterior, nos encontramos en el **tercer** paso, por lo que debemos desencriptar la clave de sesión con la clave privada del receptor. Esto lo hacemos con el comando:
+
+  `openssl rsautl -in encrypted-sessionkey -out decrypted-sessionkey -inkey nombreRSApriv.pem -decrypt`
+
+  Si hacemos un `cat` al fichero `decrypted-sessionkey` observamos el siguiente contenido (que debe coincidir, y coincide con el `sessionkey` original):
+
+  `118e4cab64e22241b3baacd27cfb65146b23967452588b2373e78bf8fbb662e9
+  -aes-256-ecb`
+
+  - Una vez obtenida la clave de sesión, el receptor al fin tiene acceso al mensaje, ya que esta `sessionkey` contiene la clave simétrica con la que se protegió dicho mensaje, y además indica el método con el que se cifró. Por tanto, ejecutamos el descifrado con el modo indicado de la siguiente forma:
+
+  `openssl aes-256-ecb -d -in binarios/input-aes-256-ecb.bin -out binarios/decrypted-input-aes-256-ecb.bin -pass file:decrypted-sessionkey`
+
+  - Para terminar, vemos que el archivo `input-aes-256-ecb.bin` tiene el mismo contenido que el mensaje original (`input.bin`):
+
+  <img src="./capturas/decrypted-input-aes-256-ecb.bin.bmp" width="70%" alt="decrypted-input-aes-256-ecb.bin.bmp">
+
+---
+
+# Curvas elípticas
+
+### 8. Generad un archivo stdECparam.pem que contenga los parámetros públicos de una de las curvas elípticas contenidas en las transparencias de teoría. Si no lográis localizarlas haced el resto de la práctica con una curva cualquiera a vuestra elección de las disponibles en OpenSSL. Mostrad los valores.
+
+Si queremos ver las curvas elípticas disponibles en nuestra versión de OpenSSL podemos ejecutar el comando `openssl ecparam -list_curves`, que nos proporcionará una lista más o menos extensa con todas ellas.
+
+Veamos algunas líneas de esta lista. Los conceptos clave y siglas más comunes se detallan al final del guión en el apartado de **Conceptos clave**.
+
+```
+secp160r2 : SECG/WTLS curve over a 160 bit prime field
+secp224r1 : NIST/SECG curve over a 224 bit prime field
+prime256v1: X9.62/SECG curve over a 256 bit prime field
+sect193r2 : SECG curve over a 193 bit binary field
+wap-wsg-idm-ecid-wtls12: WTLS curvs over a 224 bit prime field
+brainpoolP224t1: RFC 5639 curve over a 224 bit prime field
+Oakley-EC2N-4:
+	IPSec/IKE/Oakley curve #4 over a 185 bit binary field.
+	Not suitable for ECDSA.
+	Questionable extension field!
+```
+
+
+
+---
+
+### 9. Generad cada uno de vosotros una clave para los parámetros anteriores. La clave se almacenará en nombreECkey.pem y no es necesario protegerla por contraseña.
+
+---
+
+### 10. "Extraed" la clave privada contenida en el archivo nombreECkey.pem a otro archivo que tenga por nombre nombreECpriv.pem. Este archivo deberá estar protegido por contraseña cifrándolo con 3DES. Mostrad sus valores.
+
+---
+
+### 11. Extraed en nombreECpub.pem la clave pública contenida en el archivo nombreECkey.pem. Como antes nombreECpub.pem no debe estar cifrado ni protegido. Mostrad sus valores.
+
+---
+
+## Conceptos clave
+
+- **SECG**: *Standards for Efficient Cryptography Group*, consorcio internacional fundado por [***Certicom***](https://www.certicom.com.pe/) en 1998, que desarrolla estándares para criptografía basada en curvas elípticas de forma eficiente. En este grupo entran grandes conglomerados como *Fujitsu*, *Entrust* y *VISA*.
+- **WTLS**: *Wireless Transport Layer Security*, se trata de un protocolo de seguridad perteneciente al conjunto de protocolos **WAP** (*Wireless Application Protocol*). Deriva del protocolo *Transport Layer Security* y utiliza una semántica similar pero adaptada a dispositivos móviles con menor ancho de banda.
+- **X9.62**: [AMERICAN NATIONAL STANDARD, Public Key Cryptography for the Financial Services Industry](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.202.2977&rep=rep1&type=pdf).
+- **IPSec**: abreviatura de *Internet Protocol Security*. Conjunto de protocolos cuya función es asegurar las comunicaciones sobre IP autenticando y cifrando cada paquete en un flujo de datos.
+- **IKE**: *Internet key exchange*, se trata de un protocolo usado sobre el protocolo IPSec. Utiliza un intercambio de claves *Diffie-Hellman* (visto en teoría) y suelen utilizar sistemas de clave pública o pre-compartida. Permite especificar el tiempo de vida de la sesión.
+- **Oakley**: *Oakley Key Determination Protocol*, se trata de un protocolo de negociación de claves de sesión que permite a dos partes autenticadas establecer un canal de comunicación seguro sobre un medio que no lo es. Utiliza el conocido algoritmo *Diffie-Hellman*. Sentó las bases para el conocido *Internet key exchange* (mencionado arriba).
+- **ECDSA**: *Elliptic Curve Digital Signature Algorithm*. Se trata de una modificación del algoritmo **DSA** (*Digital Signature Algorithm*) que emplea operaciones sobre puntos de curvas elípticas en lugar de las exponenciales que utiliza DSA. La ventaja es que brinda la misma seguridad con números de tamaño menor.
 
 ## Referencias
 
-- [https://en.wikibooks.org/wiki/Cryptography/Generate_a_keypair_using_OpenSSL](https://en.wikibooks.org/wiki/Cryptography/Generate_a_keypair_using_OpenSSL)
-- [https://rietta.com/blog/2012/01/27/openssl-generating-rsa-key-from-command/](https://rietta.com/blog/2012/01/27/openssl-generating-rsa-key-from-command/)
+- Par de claves: [https://en.wikibooks.org/wiki/Cryptography/Generate_a_keypair_using_OpenSSL](https://en.wikibooks.org/wiki/Cryptography/Generate_a_keypair_using_OpenSSL)
+- Generar claves RSA: [https://rietta.com/blog/2012/01/27/openssl-generating-rsa-key-from-command/](https://rietta.com/blog/2012/01/27/openssl-generating-rsa-key-from-command/)
+- RFC sobre curvas elípticas: [https://www.ietf.org/rfc/rfc5480.txt](https://www.ietf.org/rfc/rfc5480.txt)
+- *Elliptic Curves over Prime and Binary Fields in Cryptography*: [https://www.fields.utoronto.ca/programs/scientific/07-08/cryptography/dana_neustadter.pdf](https://www.fields.utoronto.ca/programs/scientific/07-08/cryptography/dana_neustadter.pdf)
+- *IPSec*: [https://es.wikipedia.org/wiki/IPsec](https://es.wikipedia.org/wiki/IPsec)
+- *SECG*: [https://en.wikipedia.org/wiki/SECG](https://en.wikipedia.org/wiki/SECG)
+- *IKE*: [https://es.wikipedia.org/wiki/Internet_key_exchange](https://es.wikipedia.org/wiki/Internet_key_exchange)
+- *ECDSA*: [https://es.wikipedia.org/wiki/ECDSA](https://es.wikipedia.org/wiki/ECDSA)
