@@ -141,19 +141,83 @@ Oakley-EC2N-4:
 	Questionable extension field!
 ```
 
+La definición de los conceptos más *"extraños"* de esta lista la podemos consultar en el apartado de **Conceptos clave** al final de este guión.
 
+Por mi parte, me quedaré por ejemplo con ***brainpoolP224t1***. Generaremos los parámetros públicos de esta curva con el comando `openssl ecparam -name brainpoolP224t1 -out stdECparam.pem -text`. El resultado obtenido en el fichero de salida `stdECparam.pem` es el siguiente:
+
+```
+ASN1 OID: brainpoolP224t1
+-----BEGIN EC PARAMETERS-----
+BgkrJAMDAggBAQY=
+-----END EC PARAMETERS-----
+```
+
+La opción `-text` añade la primera línea de descripción al fichero, de forma que se pueda ver la [*Abstract Syntax Notation One*](https://es.wikipedia.org/wiki/ASN.1) utilizada. Ésta es una norma para representar datos independientemente de la máquina que se esté usando y sus formas de representación internas.
+
+Si quisiéramos leer un fichero de esta notación que no incluya esa primera línea, podríamos usar un decodificador como éste: [http://lapo.it/asn1js](http://lapo.it/asn1js). Este es un ejemplo online, y si en el campo de texto insertamos la cadena de parámetros `BgkrJAMDAggBAQY=` nos decodificará esta cadena resultando en la siguiente salida, detallando la curva elíptica usada además de los parámetros de codificación que utiliza:
+
+![brainpoolP224t1.png](./capturas/brainpoolP224t1.png)
 
 ---
 
 ### 9. Generad cada uno de vosotros una clave para los parámetros anteriores. La clave se almacenará en nombreECkey.pem y no es necesario protegerla por contraseña.
 
+Una vez que tenemos la curva elíptica elegida y sus parámetros, generamos la clave usando esos parámetros con el siguiente comando:
+
+```bash
+openssl ecparam -in stdECparam.pem -genkey -out nombreECkey.pem
+```
+
+El contenido de la clave generada lo obtenemos mostrando el contenido del fichero. Como podemos apreciar, las 3 primeras líneas de dicho fichero nos muestran los parámetros obtenidos previamente y utilizados para la generación de la clave. Si no quisiéramos incluir esto en este archivo, bastaría con concatenar la opción ` -noout` al comando previo.
+
+```
+-----BEGIN EC PARAMETERS-----
+BgkrJAMDAggBAQY=
+-----END EC PARAMETERS-----
+-----BEGIN EC PRIVATE KEY-----
+MGwCAQEEHGPciDGsYujd4YhlfAYwlHaDw/Q3H6/NBnTxQwqgCwYJKyQDAwIIAQEG
+oTwDOgAEbyQIlYF4GlO6BMlTwfMF8PDBsm7v5qyDgoKczD2xMr5cwYsal8LlyeqK
+HKRX23mzR0VK7+6FdBM=
+-----END EC PRIVATE KEY-----
+```
+
 ---
 
 ### 10. "Extraed" la clave privada contenida en el archivo nombreECkey.pem a otro archivo que tenga por nombre nombreECpriv.pem. Este archivo deberá estar protegido por contraseña cifrándolo con 3DES. Mostrad sus valores.
 
+Al igual que con `rsa` y `rsautl`, para las curvas elípticas tenemos dos comandos diferentes para la generación y el tratamiento de información, que son `ecparam` (usado antes) y `ec`, respectivamente. Para extraer las claves privada y pública utilizaremos este último de forma sencilla. Empezaremos por la privada con el siguiente comando:
+
+`openssl ec -in nombreECkey.pem -out nombreECpriv.pem -des3`
+
+Obviamente, la opción `-des3` asigna el cifrado 3DES al fichero para protegerlo con contraseña. Usaremos 0123456789 como venimos haciendo en toda la práctica. El contenido del fichero `nombreECpriv.pem` generado es el siguiente:
+
+```
+-----BEGIN EC PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: DES-EDE3-CBC,39539FF3980DFBBD
+
+Muoajh01Cu4kQfx/S4ec2/rTzQX05pRmXsiwzM7AQDY6dxK2z81/BKAweHJQnzpw
+QVHLIU1NtACdNYMaC+DkrbMCCSvrUjdp0TdWr62cZ3OYw/XUc5u/A7gsNd7BLxZS
+kijK8aJ7JZUZ+12rRgIXGg==
+-----END EC PRIVATE KEY-----
+```
+
 ---
 
 ### 11. Extraed en nombreECpub.pem la clave pública contenida en el archivo nombreECkey.pem. Como antes nombreECpub.pem no debe estar cifrado ni protegido. Mostrad sus valores.
+
+Con respecto a la clave pública el proceso es muy similar al del ejercicio anterior con la clave privada; quitando la protección con 3DES y añadiendo al comando tan solo la opción `-pubout`, ya que `openssl ec` coge por defecto la privada a no ser que le indiquemos hacer otra cosa.
+
+`openssl ec -in nombreECkey.pem -out nombreECpub.pem -pubout`
+
+El valor de la clave pública generada es éste:
+
+```
+-----BEGIN PUBLIC KEY-----
+MFIwFAYHKoZIzj0CAQYJKyQDAwIIAQEGAzoABG8kCJWBeBpTugTJU8HzBfDwwbJu
+7+asg4KCnMw9sTK+XMGLGpfC5cnqihykV9t5s0dFSu/uhXQT
+-----END PUBLIC KEY-----
+```
 
 ---
 
