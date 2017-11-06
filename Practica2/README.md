@@ -7,11 +7,11 @@
 
 Generamos el par de claves fácilmente con el comando `openssl genrsa`, pasando como argumentos el fichero de destino (especificado por el enunciado del ejercicio) así como el número de bits de tamaño de la clave:
 
-  `openssl genrsa -out nombreRSAkey.pem 768`
+  `openssl genrsa -out AdrianRSAkey.pem 768`
 
 Para este primer caso no la protegeremos con ninguna contraseña. El contenido es el siguiente:
 
-<img src="./capturas/nombreRSAkey.pem.bmp" width="80%" alt="nombreRSAkey.pem.bmp">
+<img src="./capturas/AdrianRSAkey.pem.bmp" width="80%" alt="AdrianRSAkey.pem.bmp">
 
 ---
 
@@ -24,9 +24,9 @@ Una vez que la clave ha sido generada, usamos el comando `openssl rsa` para mani
 
 El comando completo sería el siguiente, y a continuación una captura con el resultado:
 
-`openssl rsa -in nombreRSAkey.pem -out nombreRSApriv.pem -aes128`
+`openssl rsa -in AdrianRSAkey.pem -out AdrianRSApriv.pem -aes128`
 
-<img src="./capturas/nombreRSApriv.pem.bmp" width="80%" alt="nombreRSApriv.pem.bmp">
+<img src="./capturas/AdrianRSApriv.pem.bmp" width="80%" alt="AdrianRSApriv.pem.bmp">
 
 ---
 
@@ -34,11 +34,11 @@ El comando completo sería el siguiente, y a continuación una captura con el re
 
 Por defecto, cuando imprimimos el contenido del archivo contenedor de nuestro **par de claves**, solo se muestra la privada. Sin embargo, la pública también está ahí, solo que tenemos que usar la opción `-pubout` para que sea mostrada. Con el siguiente comando la obtenemos del fichero de entrada y la extraemos al fichero de salida:
 
-`openssl rsa -in nombreRSAkey.pem -out nombreRSApub.pem -pubout`
+`openssl rsa -in AdrianRSAkey.pem -out AdrianRSApub.pem -pubout`
 
 Lógicamente, una clave pública no debe ser protegida con contraseña. El valor obtenido es:
 
-<img src="./capturas/nombreRSApub.pem.bmp" width="80%" alt="nombreRSApub.pem.bmp">
+<img src="./capturas/AdrianRSApub.pem.bmp" width="80%" alt="AdrianRSApub.pem.bmp">
 
 ---
 
@@ -52,9 +52,9 @@ Recuperamos el fichero que tenía el siguiente contenido:
 
 ### 5. Intentad cifrar input.bin con vuestra clave pública. Explicad el resultado.
 
-Para el ejemplo, vamos a intentar cifrar el archivo input.bin con *DES* en modo *ECB*, pasando como entrada la clave pública contenida en el archivo `nombreRSApub.pem`:
+Para el ejemplo, vamos a intentar cifrar el archivo input.bin con *DES* en modo *ECB*, pasando como entrada la clave pública contenida en el archivo `AdrianRSApub.pem`:
 
-`openssl rsautl -in binarios/input.bin -out binarios/input-rsa.bin -inkey nombreRSApub.pem -pubin -encrypt`
+`openssl rsautl -in binarios/input.bin -out binarios/input-rsa.bin -inkey AdrianRSApub.pem -pubin -encrypt`
 
 Sin embargo, obtenemos el siguiente error:
 
@@ -80,7 +80,7 @@ El error obtenido se debe a que RSA es un cifrado de flujo y no por bloques, as�
   - Vamos a utilizar el sistema AES-256 en modo ECB, por lo que deberemos utilizar claves de 256 bits (32 Bytes exactamente) y bloques de 128 bits.
   - Deberemos crear el fichero `sessionkey` con una longitud de clave de 256 bits en la primera línea, con el comando `openssl rand -out sessionkey -hex 32`, y la opción -aes-256-ecb en la segunda.
   - Ahora pasamos a cifrar dicho archivo con la clave pública del receptor. Para este caso de ejemplo, utilizaremos la clave pública generada en los ejercicios anteriores, utilizando el comando visto en el ejercicio anterior:
-  `openssl rsautl -in sessionkey -out encrypted-sessionkey -inkey nombreRSApub.pem -pubin -encrypt`. Esto generará un contenido binario que no podemos visualizar en la terminal, pero sí en el editor hexadecimal:
+  `openssl rsautl -in sessionkey -out encrypted-sessionkey -inkey AdrianRSApub.pem -pubin -encrypt`. Esto generará un contenido binario que no podemos visualizar en la terminal, pero sí en el editor hexadecimal:
 
   <img src="./capturas/encrypted-sessionkey.bmp" width="70%" alt="encrypted-sessionkey.bmp">
 
@@ -103,7 +103,7 @@ Con este método, nos aseguramos de que nadie salvo el receptor (quien se presup
 
   - Ahora bien, tras lo realizado en el ejercicio anterior, nos encontramos en el **tercer** paso, por lo que debemos desencriptar la clave de sesión con la clave privada del receptor. Esto lo hacemos con el comando:
 
-  `openssl rsautl -in encrypted-sessionkey -out decrypted-sessionkey -inkey nombreRSApriv.pem -decrypt`
+  `openssl rsautl -in encrypted-sessionkey -out decrypted-sessionkey -inkey AdrianRSApriv.pem -decrypt`
 
   Si hacemos un `cat` al fichero `decrypted-sessionkey` observamos el siguiente contenido (que debe coincidir, y coincide con el `sessionkey` original):
 
@@ -160,12 +160,12 @@ Si quisiéramos leer un fichero de esta notación que no incluya esa primera lí
 
 ---
 
-### 9. Generad cada uno de vosotros una clave para los parámetros anteriores. La clave se almacenará en nombreECkey.pem y no es necesario protegerla por contraseña.
+### 9. Generad cada uno de vosotros una clave para los parámetros anteriores. La clave se almacenará en AdrianECkey.pem y no es necesario protegerla por contraseña.
 
 Una vez que tenemos la curva elíptica elegida y sus parámetros, generamos la clave usando esos parámetros con el siguiente comando:
 
 ```bash
-openssl ecparam -in stdECparam.pem -genkey -out nombreECkey.pem
+openssl ecparam -in stdECparam.pem -genkey -out AdrianECkey.pem
 ```
 
 El contenido de la clave generada lo obtenemos mostrando el contenido del fichero. Como podemos apreciar, las 3 primeras líneas de dicho fichero nos muestran los parámetros obtenidos previamente y utilizados para la generación de la clave. Si no quisiéramos incluir esto en este archivo, bastaría con concatenar la opción ` -noout` al comando previo.
@@ -187,9 +187,9 @@ HKRX23mzR0VK7+6FdBM=
 
 Al igual que con `rsa` y `rsautl`, para las curvas elípticas tenemos dos comandos diferentes para la generación y el tratamiento de información, que son `ecparam` (usado antes) y `ec`, respectivamente. Para extraer las claves privada y pública utilizaremos este último de forma sencilla. Empezaremos por la privada con el siguiente comando:
 
-`openssl ec -in nombreECkey.pem -out nombreECpriv.pem -des3`
+`openssl ec -in AdrianECkey.pem -out AdrianECpriv.pem -des3`
 
-Obviamente, la opción `-des3` asigna el cifrado 3DES al fichero para protegerlo con contraseña. Usaremos 0123456789 como venimos haciendo en toda la práctica. El contenido del fichero `nombreECpriv.pem` generado es el siguiente:
+Obviamente, la opción `-des3` asigna el cifrado 3DES al fichero para protegerlo con contraseña. Usaremos 0123456789 como venimos haciendo en toda la práctica. El contenido del fichero `AdrianECpriv.pem` generado es el siguiente:
 
 ```
 -----BEGIN EC PRIVATE KEY-----
@@ -208,7 +208,7 @@ kijK8aJ7JZUZ+12rRgIXGg==
 
 Con respecto a la clave pública el proceso es muy similar al del ejercicio anterior con la clave privada; quitando la protección con 3DES y añadiendo al comando tan solo la opción `-pubout`, ya que `openssl ec` coge por defecto la privada a no ser que le indiquemos hacer otra cosa.
 
-`openssl ec -in nombreECkey.pem -out nombreECpub.pem -pubout`
+`openssl ec -in AdrianECkey.pem -out AdrianECpub.pem -pubout`
 
 El valor de la clave pública generada es éste:
 
