@@ -206,11 +206,49 @@ A continuación de las claves públicas, se nos muestran los parámetros con que
 
 ### 5. Calculad el valor hash del archivo con la clave pública adrianDSApub.pem usando sha384 con salida hexadecimal con bloques de dos caracteres separados por dos puntos. Mostrad los valores por salida estándar y guardadlo en adrianDSApub.sha384.
 
+Sabemos que la directiva para trabajar con funciones hash en OpenSSL es `dgst`. Ahora bien, acompañado de opciones como `-sha1`, `md5` o `sha384` podemos especificar el hash a utilizar. Nosotros utilizaremos este último para lo que queremos realizar.
 
+Además, con la opción `-hex` realizaremos la salida en formato hexadecimal. Y con la opción `-c` seguida del nombre de fichero mostraremos todos los caracteres hexadecimal en columnas de dos caracteres separadas por dos puntos. La instrucción final sería la siguiente:
+
+```
+$ openssl dgst -sha384 -hex -c adrianDSApub.pem
+```
+
+El resultado del hash es el siguiente:
+
+```
+SHA384(adrianDSApub.pem)= 1e:69:6f:46:d4:82:d4:59:a9:a1:fc:6d:c9:90:70:db:e0:56:56:c8:4f:59:57:6a:97:45:e8:ed:d5:bb:ed:cf:91:93:85:74:12:98:f0:ac:29:a9:dc:86:6e:b6:8d:26
+```
+
+Sin embargo, el comando previo solo muestra el resultado por pantalla. Si queremos derivar el resultado a un fichero especificado, debemos modificar la instrucción añadiendo `-c <fichero_de_destino` antes del nombre del fichero de entrada:
+
+```
+$ openssl dgst -sha384 -hex -c -out adrianDSApub.sha384 adrianDSApub.pem
+```
 
 ***
 
 ### 6. Calculad el valor hash del archivo con la clave pública morenteDSApub.pem usando una función hash de 160 bits con salida binaria. Guardad el hash en morenteDSApub.[algoritmo] y mostrad su contenido.
+
+Para realizar un hash con 160 bits, podemos usar la opción `-ripemd160`, que implementa la función hash [**RACE Integrity Primitives Evaluation Message Digest** o *RIPEMD-160*](https://es.wikipedia.org/wiki/RIPEMD-160).
+
+El comando a ejecutar es muy similar al del ejercicio anterior, sustituyendo el nombre de la función a utilizar, y utilizando `-binary` en lugar de `-hex` (para la salida binaria):
+
+```
+$ openssl dgst -ripemd160 -binary morenteDSApub.pem
+```
+
+La salida resultante será obviamente un binario ilegible similar a esto: `ȇ��us�h1b@�c������h%`.
+
+Por otro lado, para redirigir esta salida a un fichero concreto, procedemos como en el ejercicio anterior:
+
+```
+$ openssl dgst -ripemd160 -binary -out morenteDSApub.ripemd160 morenteDSApub.pem
+```
+
+Para visualizar su contenido binario, utilizaremos el editor hexadecimal como venimos haciendo en todas las prácticas:
+
+<img src="./capturas/morenteDSApub.ripemd160.png" width="80%" alt="morenteDSApub.ripemd160.png">
 
 ***
 
