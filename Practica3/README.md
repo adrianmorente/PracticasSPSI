@@ -16,8 +16,13 @@ $ openssl dsaparam -out sharedDSA.pem 512
 ```
 Generating DSA parameters, 512 bit long prime
 This could take some time
-.....+.......................................+++++++++++++++++++++++++++++++++++++++++++++++++++*
-.......+.....+....+...........................+.+........+.+..+..............+.......+...+........+.....................+.........................+.........+......................+..+.........+..+.........+...+...........+....+....+.+................+++++++++++++++++++++++++++++++++++++++++++++++++++*
+.....+.......................................+++++++++++++++++
+++++++++++++++++++++++++++++++++++*.......+.....+....+........
+...................+.+........+.+..+..............+.......+...
++........+.....................+.........................+....
+.....+......................+..+.........+..+.........+...+...
+........+....+....+.+................+++++++++++++++++++++++++
+++++++++++++++++++++++++++*
 ```
 
 El contenido en ASCII del fichero con los parámetros generados es el siguiente:
@@ -217,7 +222,9 @@ $ openssl dgst -sha384 -hex -c adrianDSApub.pem
 El resultado del hash es el siguiente:
 
 ```
-SHA384(adrianDSApub.pem)= 1e:69:6f:46:d4:82:d4:59:a9:a1:fc:6d:c9:90:70:db:e0:56:56:c8:4f:59:57:6a:97:45:e8:ed:d5:bb:ed:cf:91:93:85:74:12:98:f0:ac:29:a9:dc:86:6e:b6:8d:26
+SHA384(adrianDSApub.pem)= 1e:69:6f:46:d4:82:d4:59:a9:a1:fc:6d:c9:90:70:db:e0:56:56:c8:4f:
+59:57:6a:97:45:e8:ed:d5:bb:ed:cf:91:93:85:74:12:98:f0:ac:29:a9:
+dc:86:6e:b6:8d:26
 ```
 
 Sin embargo, el comando previo solo muestra el resultado por pantalla. Si queremos derivar el resultado a un fichero especificado, debemos modificar la instrucción añadiendo `-c <fichero_de_destino` antes del nombre del fichero de entrada:
@@ -254,8 +261,122 @@ Para visualizar su contenido binario, utilizaremos el editor hexadecimal como ve
 
 ### 7. Generad el valor HMAC del archivo sharedDSA.pem con clave '12345' mostrándolo por pantalla.
 
+El código de autentificación de mensaje en clave-hash (HMAC) permite garantizar la **autenticación** y la **integridad** de un mensaje; asegurando por tanto que el emisor es quien dice ser, y que la información enviada no ha sido modificada sin permiso expreso.
+
+La forma de conseguir esto es definiendo un protocolo en el que:
+
++ El emisor cifra el mensaje de una forma u otra; y lo **firma** con su clave privada.
++ Como su clave pública está al alcance de cualquiera, todos pueden usar dicha clave para verificar que dicho mensaje efectivamente ha sido firmada por quien dice haberlo hecho.
++ Por otro lado, para garantizar la confidencialidad, el/los receptor/receptores deberán disponer de algún mecanismo de descifrado para leer el mensaje original.
+
+***
+
+La forma de realizar un hash HMAC con OpenSSL es sencillo, y basta con usar la directiva `dgst`, la opción `-hmac` y un argumento con el que realizar el hash ('12345' en este caso). Para terminar, el nombre del fichero a *hashear*:
+
+```
+$ openssl dgst -hmac 12345 sharedDSA.pem
+```
+
+El resultado es tal que así:
+
+```
+HMAC-SHA256(sharedDSA.pem)=66d826a9baa203c7cebf0fd82a90eb
+cbc1bc0f59193121176e4989fb84d124f4
+```
+
 ***
 
 ### 8. Simulad una ejecución completa del protocolo Estación a Estación. Para ello emplearemos como claves para firma/verificación las generadas en esta práctica, y para el protocolo DH emplearemos las claves asociadas a curvas elípticas de la práctica anterior junto con las de otro usuario simulado que deberéis generar nuevamente. Por ejemplo, si mi clave privada está en javierECpriv.pem y la clave pública del otro usuario está en lobilloECpub.pem, el comando para generar la clave derivada será `$ openssl pkeyutl -inkey javierECpriv.pem -peerkey lobilloECpub.pem -derive -out key.bin`. El algoritmo simétrico a utilizar en el protocolo estación a estación será AES-128 en modo CFB8.
 
+En esta simulación tendremos dos usuarios con los que hemos venido trabajando a lo largo de la práctica. Estos son `adrian` y `morente`. Cada uno de ellos cuenta con sus pares de claves pública y privada para firma y verificación de identidad.
+
+Adicionalmente, dispondrán de otro par basado en curvas elípticas, que es el que utilizarán para cifrar y descifrar mensajes que se envíen.
+
+El funcionamiento es el siguiente:
+
+1. Una de las partes (optaremos por `adrian`, por ejemplo) hace saber a `morente` su clave **pública** *EC* (de curvas elípticas); de forma que `morente`, junto con la suya **privada**, genere una clave `**k**` única que será común a ambos para esta sesión.
+
+2. Ahora `morente` sabe de las dos claves públicas existentes en la conversación (la suya y la de `adrian`); así que **concatena ambas** en un único archivo (con la de `adrian` al principio y la suya al final) al que llamaremos `mensaje` y lo firma con su clave privada.
+
+3. Por otro lado, encripta el archivo de su firma con el algoritmo *AES-128* en modo *CFB8*. Una vez hecho esto, envía a `adrian` **tanto la firma encriptada como su clave pública de EC**.
+
+4. Volvemos a `adrian`, que ahora sigue los mismos pasos vistos de 1. a 3. pero a la inversa. Ha de conocer el método de cifrado usado por `morente`; y junto con la `k` obtenida en el paso 1, (**que será igual a la `k` de `morente`**), desencripta el fichero con la firma de `morente`.
+
+5. Ahora bien, teniendo la firma de `morente`, puede verificar la integridad y la autenticación del `mensaje` recibido. Esta verificación ha de resultar en *OK*, de forma que el protocolo pueda seguir adelante. Si no es así, alguna parte se habrá visto comprometida, o el mensaje corrupto.
+
+6. Ahora es `adrian` quien envía las claves públicas de forma concatenada (con la suya al final, claro) en un archivo firmado **con su clave privada**. Una vez firmado, lo encripta con la clave `k` y lo envía a `morente`.
+
+7. (Similar al paso 5): `morente` ya conoce la clave `k` usada así que puede desencriptar el mensaje y verificar la firma de `adrian` en dicho fichero mediante su clave pública obtenida anteriormente. Esta verificación sigue las mismas pautas que la del paso 5.
+
+8. Una vez que ambas verificaciones han dado *OK* como resultado, ambos pueden confiar en que la clave `k` de sesión **solo es conocida por ellos**.
+
 ***
+
+Vamos a proceder a la simulación de este protocolo mediante los comandos correspondientes. Para empezar, como se hizo en la práctica anterior, vamos a generar los pares de claves con curvas elípticas para cada usuario:
+
+```
+adrian
+
+$ openssl ecparam -in stdECparam.pem -genkey -out adrianECkey.pem -noout
+$ openssl ec -in adrianECkey.pem -out adrianECpriv.pem -des3
+$ openssl ec -in adrianECkey.pem -out adrianECpub.pem -pubout
+```
+
+```
+morente
+
+$ openssl ecparam -in stdECparam.pem -genkey -out morenteECkey.pem -noout
+$ openssl ec -in morenteECkey.pem -out morenteECpriv.pem -des3
+$ openssl ec -in morenteECkey.pem -out morenteECpub.pem -pubout
+```
+
+Ahora bien, una vez que ambos se han compartido su clave pública y han calculado localmente la clave `k` como hemos indicado anteriormente, ambos proceden a realizar la derivada indicada en el guión.
+
++ La directiva `pkeyutl` de OpenSSL se utiliza para manipular claves públicas en algoritmos.
++ La opción `-derive` provee de un secreto compartido a partir de la derivada antes mencionada, usando el archivo especificado con `-peerkey` como entrada.
++ La opción `-inkey` permite especificar la clave privada del algoritmo (`k`, en nuestro caso).
++ Finalmente, `-out` indica el fichero de destino, como de costumbre; en este caso para almacenar `k`.
+
+```
+adrian
+
+$ openssl pkeyutl -derive -inkey adrianECpriv.pem -peerkey morenteECpub.pem -out adrianKey.bin
+```
+
+```
+morente
+
+$ openssl pkeyutl -derive -inkey morenteECpriv.pem -peerkey adrianECpub.pem -out morenteKey.bin
+```
+
+Una vez hecho esto, tanto `adrianKey.bin` como `morenteKey.bin` son idénticos. Con el comando `diff` podemos comprobarlo.
+
+***
+
+Ahora bien, simulemos el paso en el que `adrian` concatena ambas claves públicas y cifra el archivo con la clave `k`:
+
+```
+adrian
+
+$ cat morenteECpub.pem adrianECpub.pem > pubConcatMorAdr
+$ openssl dgst -out firmadoAdrian -sign adrianDSApriv.pem pubConcatMorAdr
+$ openssl enc -aes-128-cfb8 -out encriptFirmadoAdrian -in firmadoAdrian -kfile adrianKey.bin
+```
+
+***
+
+Una vez llegados aquí, y habiendo recibido `morente` el archivo `encriptFirmadoAdrian`, lo descifra con su clave `k`; concatena ambas claves públicas como hemos indicado antes, y verifica el proceso:
+
+```
+$ openssl aes-128-cfb8 -d -in encriptFirmadoAdrian -out desencriptFirmadoAdrian -kfile morenteKey.bin
+$ cat morenteECpub.pem adrianECpub.pem > pubConcatAdrMor
+$ openssl dgst -verify adrianDSApub.pem -signature desencriptFirmadoAdrian pubConcatAdrMor
+```
+
+Podemos comprobar con el último comando que la verificación tiene éxito:
+
+<img src="./capturas/verificacionFirma.png" width="95%">
+
+***
+
+Pasemos ahora a la verificación de la otra parte.
