@@ -222,9 +222,10 @@ $ openssl dgst -sha384 -hex -c adrianDSApub.pem
 El resultado del hash es el siguiente:
 
 ```
-SHA384(adrianDSApub.pem)= 1e:69:6f:46:d4:82:d4:59:a9:a1:fc:6d:c9:90:70:db:e0:56:56:c8:4f:
-59:57:6a:97:45:e8:ed:d5:bb:ed:cf:91:93:85:74:12:98:f0:ac:29:a9:
-dc:86:6e:b6:8d:26
+SHA384(adrianDSApub.pem)=1e:69:6f:46:d4:82:d4:59:
+a9:a1:fc:6d:c9:90:70:db:e0:56:56:c8:4f:59:57:6a:
+97:45:e8:ed:d5:bb:ed:cf:91:93:85:74:12:98:f0:ac:
+29:a9:dc:86:6e:b6:8d:26
 ```
 
 Sin embargo, el comando previo solo muestra el resultado por pantalla. Si queremos derivar el resultado a un fichero especificado, debemos modificar la instrucción añadiendo `-c <fichero_de_destino` antes del nombre del fichero de entrada:
@@ -340,13 +341,15 @@ Ahora bien, una vez que ambos se han compartido su clave pública y han calculad
 ```
 adrian
 
-$ openssl pkeyutl -derive -inkey adrianECpriv.pem -peerkey morenteECpub.pem -out adrianKey.bin
+$ openssl pkeyutl -derive -inkey adrianECpriv.pem -peerkey
+morenteECpub.pem -out adrianKey.bin
 ```
 
 ```
 morente
 
-$ openssl pkeyutl -derive -inkey morenteECpriv.pem -peerkey adrianECpub.pem -out morenteKey.bin
+$ openssl pkeyutl -derive -inkey morenteECpriv.pem -peerkey
+adrianECpub.pem -out morenteKey.bin
 ```
 
 Una vez hecho esto, tanto `adrianKey.bin` como `morenteKey.bin` son idénticos. Con el comando `diff` podemos comprobarlo.
@@ -359,8 +362,10 @@ Ahora bien, simulemos el paso en el que `adrian` concatena ambas claves pública
 adrian
 
 $ cat morenteECpub.pem adrianECpub.pem > pubConcatMorAdr
-$ openssl dgst -out firmadoAdrian -sign adrianDSApriv.pem pubConcatMorAdr
-$ openssl enc -aes-128-cfb8 -out encriptFirmadoAdrian -in firmadoAdrian -kfile adrianKey.bin
+$ openssl dgst -out firmadoAdrian -sign adrianDSApriv.pem
+pubConcatMorAdr
+$ openssl enc -aes-128-cfb8 -out encriptFirmadoAdrian -in
+firmadoAdrian -kfile adrianKey.bin
 ```
 
 ***
@@ -368,15 +373,44 @@ $ openssl enc -aes-128-cfb8 -out encriptFirmadoAdrian -in firmadoAdrian -kfile a
 Una vez llegados aquí, y habiendo recibido `morente` el archivo `encriptFirmadoAdrian`, lo descifra con su clave `k`; concatena ambas claves públicas como hemos indicado antes, y verifica el proceso:
 
 ```
-$ openssl aes-128-cfb8 -d -in encriptFirmadoAdrian -out desencriptFirmadoAdrian -kfile morenteKey.bin
-$ cat morenteECpub.pem adrianECpub.pem > pubConcatAdrMor
-$ openssl dgst -verify adrianDSApub.pem -signature desencriptFirmadoAdrian pubConcatAdrMor
+$ openssl aes-128-cfb8 -d -in encriptFirmadoAdrian -out desencriptFirmadoAdrian
+ -kfile morenteKey.bin
+$ cat morenteECpub.pem adrianECpub.pem > pubConcatMorAdr
+$ openssl dgst -verify adrianDSApub.pem -signature
+desencriptFirmadoAdrian pubConcatMorAdr
 ```
 
 Podemos comprobar con el último comando que la verificación tiene éxito:
 
-<img src="./capturas/verificacionFirma.png" width="95%">
+<img src="./capturas/verificacionFirma1.png" width="95%">
 
 ***
 
-Pasemos ahora a la verificación de la otra parte.
+Pasemos ahora a la verificación de la otra parte. `adrian` firma el archivo de concatenación realizado antes, lo encripta y lo envía:
+
+```
+morente
+
+$ cat adrianECpub.pem morenteECpub.pem > pubConcatAdrMor
+$ openssl dgst -out firmadoMorente -sign morenteDSApriv.pem
+pubConcatAdrMor
+$ openssl enc -aes-128-cfb8 -out encriptFirmadoMorente -in
+firmadoMorente -kfile morenteKey.bin
+```
+
+Una vez recibido, `adrian` desencripta la firma con el archivo `k`; y para terminar realiza la verificación de forma similar a como lo hizo `morente`:
+
+```
+adrian
+
+$ openssl aes-128-cfb8 -d -in encriptFirmadoMorente -out desencriptFirmadoMorente
+-kfile adrianKey.bin
+$ openssl dgst -verify morenteDSApub.pem -signature
+desencriptFirmadoMorente pubConcatAdrMor
+```
+
+Como vemos en la siguiente captura, se da el mismo resultado que en la verificación anterior, por lo que ambos usuarios pueden al fin confiar en que la clave `k` es únicamente conocida por ellos:
+
+<img src="./capturas/verificacionFirma2.png" width="95%">
+
+***
