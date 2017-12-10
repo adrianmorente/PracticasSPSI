@@ -4,7 +4,7 @@
 
 ***
 
-Antes de comenzar con los ejercicios, veremos algunos de los parámetros modificables correspondientes a las herramientas que usaremos.
+Antes de comenzar con los ejercicios, vamos a comentar algunos aspectos relevantes con respecto a la práctica, y la configuración del archivo utilizado por OpenSSL para Autoridades de Certificación.
 
 ### Comandos de utilidad para esta práctica (deben ser complementados con sus opciones pertinentes):
 
@@ -22,9 +22,20 @@ Antes de comenzar con los ejercicios, veremos algunos de los parámetros modific
 
 ***
 
-Si ejecutamos `$ openssl ca` sin ningún parámetro nos lanza algunos errores advirtiendo que no existe ninguna Autoridad de Certificación en el sistema. Además, nos dice que la configuración cargada por el programa se encuentra bajo la ruta `/usr/lib/ssl/openssl.cnf`. Para aprender a trabajar con él, haremos una copia de seguridad en `/usr/lib/ssl/openssl.cnf.BACKUP` de forma que si hacemos que OpenSSL deje de funcionar como debe, podamos volver atrás y arreglarlo. Veamos un pequeño fragmento de su contenido (que no es poco).
+Para empezar, debemos saber que la identidad de una Autoridad de Certificación se compone de dos cosas:
 
-Para empezar, veamos la sección donde se establece el directorio principal de la CA, que por defecto es `/etc/ssl/demoCA` pero no existe. Lo lógico en un caso real sería alojar estas claves en el directorio `home` del usuario correspondiente, pero como en mi ordenador ya tengo mis claves propias correspondientes, usaremos `/etc/ssl/*`:
+- **Una clave raíz** (`ca.key.pem`),
+- **Un certificado raíz** (`ca.cert.pem`).
+
+Además, en un entorno de trabajo real no existe una sola CA raíz, sino que de ésta "cuelgan" otras CAs subordinadas, que son las que pueden firmar certificados. La autoridad raíz solo se utiliza para crear nuevas subordinadas. Cuantas menos acciones realice y menos expuesta esté, mejor; ya que si se comprometiese su clave se vería comprometido **el entorno completo**.
+
+Sin embargo, el problema que nos ocupa solo consta de una de estas autoridades que será la raíz, y será la que utilicemos a lo largo de estos ejercicios.
+
+***
+
+Si ejecutamos `$ openssl ca` sin ningún parámetro nos lanza algunos errores advirtiendo que no existe ninguna Autoridad de Certificación en el sistema. Además, nos dice que la configuración cargada por el programa se encuentra bajo la ruta `/usr/lib/ssl/openssl.cnf`. Para no tener que lidiar con usuarios `root` ni trastocar la configuración inicial de OpenSSL, haremos una copia de este archivo de configuración en otro directorio (`/home/adri/SPSI-CA` en mi caso). En este directorio tendremos carpetas llamadas `certs`, `crl`, `newcerts` y `private`; necesarias para según qué tareas de una CA; y cuya definición se contempla en el archivo de configuración que vamos a describir.
+
+Veamos un pequeño fragmento de su contenido (que no es poco). Para empezar, veamos la sección donde se establece el directorio principal de la CA, que por defecto es `/etc/ssl/demoCA` pero no existe. Lo lógico en un caso real sería alojar estas claves en el directorio `home` del usuario root correspondiente, pero usaremos el directorio mencionado arriba:
 
 ```
 ####################################################################
@@ -34,7 +45,7 @@ default_ca	= CA_default		# The default ca section
 ####################################################################
 [ CA_default ]
 
-dir		= /etc/ssl		# Where everything is kept - MODIFICADO *.*
+dir		= ./demoCA		# Where everything is kept - MODIFICADO */home/adri/SPSI-CA*
 ```
 
 En el directorio `dir` arriba mencionado se almacenan todos los ficheros y variables configurables. Algunas de ellas se ven a continuación, y encontramos cosas como el almacenamiento de certificados creados (en la variable `certs`), el número de serie de la CA (en `serial`), etc.:
@@ -72,7 +83,7 @@ default_md	= default		# use public key default MD
 preserve	= no			# keep passed DN ordering
 ```
 
-Por otro lado, también podemos (y debemos, en un caso real) modificar los parámetros pertenecientes a la Autoridad de Certificación en sí; como por ejemplo la ubicación, el nombre de la organización y un correo de contacto.
+Por otro lado, también podemos (y debemos, en un caso real) modificar los parámetros pertenecientes a la política de solicitudes que debe aceptar la Autoridad de Certificación. Permite establecer políticas de restricción de firma y certificación por el país de origen del solicitante, por ejemplo.
 
 ```
 # A few difference way of specifying how similar the request should look
@@ -89,20 +100,9 @@ organizationalUnitName	= optional - MODIFICADO *SPSI*
 commonName		= supplied
 emailAddress		= optional - MODIFICADO *adrianmorente@correo.ugr.es*
 
-# For the 'anything' policy
-# At this point in time, you must list all acceptable 'object'
-# types.
-[ policy_anything ]
-countryName		= optional - MODIFICADO *Spain*
-stateOrProvinceName	= optional - MODIFICADO *Granada*
-localityName		= optional - MODIFICADO *La Chana*
-organizationName	= optional - MODIFICADO *SPSI*
-organizationalUnitName	= optional - MODIFICADO *SPSI*
-commonName		= supplied - MODIFICADO *SPSI*
-emailAddress		= optional - MODIFICADO *adrianmorente@correo.ugr.es*
 ```
 
-Para terminar, tenemos la posibilidad de modificar también parámetros como el número de bits usados en la generación de una clave, el fichero de destino para dicha vale, o las extensiones utilizadas sobre el estándar x509 (que dejaremos con valor por defecto).
+Para terminar, en el apartado `req` se especifican las opciones configurables a tener en cuenta al crear certificados o solicitudes de firmas. Tenemos la posibilidad de modificar parámetros como el número de bits usados en la generación de una clave, el fichero de destino para dicha clave, o las extensiones utilizadas sobre el estándar x509 (que dejaremos con valor por defecto).
 
 ```
 ####################################################################
