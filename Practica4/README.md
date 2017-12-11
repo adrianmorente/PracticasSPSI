@@ -24,8 +24,8 @@ Antes de comenzar con los ejercicios, vamos a comentar algunos aspectos relevant
 
 Para empezar, debemos saber que la identidad de una Autoridad de Certificación se compone de dos cosas:
 
-- **Una clave raíz** (`ca.key.pem`),
-- **Un certificado raíz** (`ca.cert.pem`).
+- **Una clave raíz** (`cakey.pem`),
+- **Un certificado raíz** (`cacert.pem`).
 
 Además, en un entorno de trabajo real no existe una sola CA raíz, sino que de ésta "cuelgan" otras CAs subordinadas, que son las que pueden firmar certificados. La autoridad raíz solo se utiliza para crear nuevas subordinadas. Cuantas menos acciones realice y menos expuesta esté, mejor; ya que si se comprometiese su clave se vería comprometido **el entorno completo**.
 
@@ -33,7 +33,7 @@ Sin embargo, el problema que nos ocupa solo consta de una de estas autoridades q
 
 ***
 
-Si ejecutamos `$ openssl ca` sin ningún parámetro nos lanza algunos errores advirtiendo que no existe ninguna Autoridad de Certificación en el sistema. Además, nos dice que la configuración cargada por el programa se encuentra bajo la ruta `/usr/lib/ssl/openssl.cnf`. Para no tener que lidiar con usuarios `root` ni trastocar la configuración inicial de OpenSSL, haremos una copia de este archivo de configuración en otro directorio (`/home/adri/SPSI-CA` en mi caso). En este directorio tendremos carpetas llamadas `certs`, `crl`, `newcerts` y `private`; necesarias para según qué tareas de una CA; y cuya definición se contempla en el archivo de configuración que vamos a describir.
+Si ejecutamos `$ openssl ca` sin ningún parámetro nos lanza algunos errores advirtiendo que no existe ninguna Autoridad de Certificación en el sistema. Además, nos dice que la configuración cargada por el programa se encuentra bajo la ruta `/usr/lib/ssl/openssl.cnf`. Para no tener que lidiar con usuarios `root` ni trastocar la configuración inicial de OpenSSL, haremos una copia de este archivo de configuración en otro directorio (`./ca` en mi caso). En este directorio tendremos carpetas llamadas `certs`, `crl`, `newcerts` y `private`; necesarias para según qué tareas de una CA; y cuya definición se contempla en el archivo de configuración que vamos a describir.
 
 Veamos un pequeño fragmento de su contenido (que no es poco). Para empezar, veamos la sección donde se establece el directorio principal de la CA, que por defecto es `/etc/ssl/demoCA` pero no existe. Lo lógico en un caso real sería alojar estas claves en el directorio `home` del usuario root correspondiente, pero usaremos el directorio mencionado arriba:
 
@@ -45,7 +45,7 @@ default_ca	= CA_default		# The default ca section
 ####################################################################
 [ CA_default ]
 
-dir		= ./demoCA		# Where everything is kept - MODIFICADO */home/adri/SPSI-CA*
+dir		= ./demoCA		# Where everything is kept - MODIFICADO *./ca*
 ```
 
 En el directorio `dir` arriba mencionado se almacenan todos los ficheros y variables configurables. Algunas de ellas se ven a continuación, y encontramos cosas como el almacenamiento de certificados creados (en la variable `certs`), el número de serie de la CA (en `serial`), etc.:
@@ -102,7 +102,7 @@ emailAddress		= optional - MODIFICADO *adrianmorente@correo.ugr.es*
 
 ```
 
-Para terminar, en el apartado `req` se especifican las opciones configurables a tener en cuenta al crear certificados o solicitudes de firmas. Tenemos la posibilidad de modificar parámetros como el número de bits usados en la generación de una clave, el fichero de destino para dicha clave, o las extensiones utilizadas sobre el estándar x509 (que dejaremos con valor por defecto).
+En el apartado `req` se especifican las opciones configurables a tener en cuenta al crear certificados o solicitudes de firmas. Tenemos la posibilidad de modificar parámetros como el número de bits usados en la generación de una clave, el fichero de destino para dicha clave, o las extensiones utilizadas sobre el estándar x509 (que dejaremos con valor por defecto).
 
 ```
 ####################################################################
@@ -127,74 +127,57 @@ x509_extensions	= v3_ca	# The extentions to add to the self signed cert
 string_mask = utf8only
 
 # req_extensions = v3_req # The extensions to add to a certificate request
+```
 
+Por otro lado, en la sección `[req_distinguished_name]` declaramos la información requerida para una petición de firma de certificado (esto es, el mensaje impreso en la terminal cuando realizamos una solicitud).
+
+```
 [ req_distinguished_name ]
-countryName			= Country Name (2 letter code) - MODIFICADO *ES*
-countryName_default		= AU - MODIFICADO *ES*
+countryName			= Country Name (2 letter code)
+countryName_default		= AU
 countryName_min			= 2
 countryName_max			= 2
 
 stateOrProvinceName		= State or Province Name (full name)
 stateOrProvinceName_default	= Some-State
 
-localityName			= Locality Name (eg, city) - MODIFICADO *La Chana*
+localityName			= Locality Name (eg, city)
 ```
+
+Existen otros apartados y secciones como `[ usr_cert ]` y `[ server_cert ]`, que se aplican a la firma de certificados de cliente y servidor, respectivamente. Existen otras secciones menos relevantes o de menos utilidad para nuestro caso, así que las obviaremos.
 
 ***
 
 ### 1. Crear una autoridad certificadora. En este caso se premiará el uso de `openssl ca` frente a `CA.pl`, aunque este último comando es admisible.
 
-Una vez que hemos ajustado a nuestro antojo los parámetros del archivo antes visto, podemos proceder a la creación de la Autoridad de Certificación. Sin embargo, si nos limitamos a cambiar sus parámetros nos encontraremos con el siguiente error:
+Una vez que hemos ajustado los parámetros de configuración deseados, si queremos crear la Autoridad de Certificación necesitamos las dos partes antes mencionadas, la clave raíz y el certificado raíz.
+
+##### 1.1. **Clave raíz**:
+
+Dentro del directorio creado al efecto (o en `/root/ca` en un caso real), ejecutamos la orden ya conocida para generar una clave, fijando como destino el directorio `/private`. Esto es obvio ya que esta clave se utilizará para emitir certificados confiables, por lo que **nadie** debe tener acceso a ella:
 
 ```
-$ openssl ca
-
-Using configuration from /usr/lib/ssl/openssl.cnf
-Error opening CA private key ./demoCA/private/cakey.pem
-140697338933056:error:02001002:system library:fopen:No such
-    file or directory:bss_file.c:398:fopen('./demoCA/private/cakey.pem','r')
-140697338933056:error:20074002:BIO routines:FILE_CTRL:system lib:bss_file.c:400:
-unable to load CA private key
+$ openssl genrsa -aes256 -out private/cakey.pem 4096
 ```
 
-Esto se debe a que la clave privada perteneciente a la CA **no existe**, ya que no la hemos creado. OpenSSL busca dicha clave, como dice en el mensaje, bajo el fichero `/usr/lib/ssl/private/cakey.pem`. Necesitaremos permisos de superusuario para crearlo/modificarlo. Además, si queremos evitar futuros problemas de permisos deberíamos dotar al usuario de permiso de lectura para la carpeta `private` (que no es más que un enlace al directorio `/etc/ssl/.`) a nuestro usuario local. Insisto en que esto es una simulación, y en un caso real se deberían alojar las claves usadas en el directorio del usuario.
+Protegemos el archivo `cakey.pem` con la contraseña `0123456789` usando AES256 y con una longitud de 4096 bytes.
 
-En este caso utilizaré una de las claves ya usadas en prácticas anteriores (concretamente, se corresponde con la del archivo `adrianDSAkey.pem` de la Práctica 3). Podemos examinar el contenido con el comando `$ openssl dsa -in /usr/lib/ssl/private/cakey.pem -text -noout`:
+<img src="./capturas/claveCAbloqueada.png" width="50%" alt="claveCAbloqueada.png"><img src="./capturas/claveCAvalor.png" width="50%" alt="claveCAvalor.png">
+
+##### 1.2. **Certificado raíz**:
+
+Una vez que tenemos la clave raíz, podemos usarla para crear el certificado raíz, que será un **certificado autofirmado**. Los parámetros de entrada al comando serán varios, en los que definimos (en este orden) el fichero de configuración, la clave raíz, el estándar seguido por el certificado (x509), los días de validez y el fichero de salida.
+
+> En cuanto a la fecha de expiración, voy a usar 14 días porque se trata de una simulación sin efecto práctico. Pero en un caso real debería ser del orden de años; dado que una vez que expire este certificado raíz, todos los demás emitidos por la CA dejarán de tener validez alguna.
 
 ```
-$ /usr/lib/ssl/private/cakey.pem
-
-read DSA key
-Private-Key: (512 bit)
-priv:
-    19:16:c7:bd:12:78:6e:69:79:74:2b:01:32:89:a4:
-    af:8c:2d:66:27
-pub:
-    22:e6:0c:67:bb:45:71:9c:c2:ba:a7:67:87:0b:f1:
-    95:d0:8f:d9:5c:34:c1:c8:b2:41:f4:1a:50:16:fc:
-    3b:1a:1a:db:09:a1:f4:be:3e:cc:a3:b7:60:f1:3d:
-    f2:19:f6:a3:94:e4:60:10:03:c2:47:6e:dd:9a:60:
-    01:bc:6e:d4
-P:   
-    00:ed:27:a3:0d:52:f9:f7:3e:db:8f:57:83:da:28:
-    02:47:4b:2a:53:02:d3:5c:51:37:2f:0e:c5:d3:f4:
-    5a:39:1f:91:fc:94:8c:d7:e8:b1:98:6c:cd:84:76:
-    bd:94:b7:50:d7:f8:a2:52:e6:72:7f:25:01:b6:cc:
-    f3:e2:63:02:eb
-Q:   
-    00:91:38:fd:95:29:0b:a4:f5:a2:f5:7c:e1:de:3a:
-    39:18:7c:a3:aa:8b
-G:   
-    03:a6:b5:4a:a3:bd:18:16:a2:1e:c5:5c:bf:59:ea:
-    e9:ef:f5:5e:ae:a2:bb:12:5e:10:91:55:2a:01:94:
-    b6:34:3d:b0:97:66:5d:dd:e0:9f:37:f1:27:33:40:
-    b6:90:6c:ae:cf:31:68:0b:e3:49:cd:d5:41:97:e3:
-    20:6d:9c:c7
+$ openssl req -config openssl.cnf -key private/cakey.pem -new -x509
+		-days 14 -sha256 -out certs/cacert.pem
 ```
 
-Una vez que hemos solventado los errores de lectura y permisos del fichero, podemos proceder a crear la Autoridad de Certificación con el comando `$ openssl ca` como antes:
+En cuanto ejecutamos el comando, se nos realizarán varias preguntas (las definidas en el fichero de configuración vistas con anterioridad) que deberemos cumplimentar para la creación del certificado autofirmado.
 
-
+<img src="./capturas/certificadoCAcreacion.png" width="95%" alt="certificadoCAcreacion.png">
 
 ***
 
